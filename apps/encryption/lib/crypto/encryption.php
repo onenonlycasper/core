@@ -25,9 +25,11 @@
 namespace OCA\Encryption\Crypto;
 
 
+use OCA\Encryption\Exceptions\PublicKeyMissingException;
 use OCA\Encryption\Util;
 use OCP\Encryption\IEncryptionModule;
 use OCA\Encryption\KeyManager;
+use OCP\ILogger;
 
 class Encryption implements IEncryptionModule {
 
@@ -66,16 +68,21 @@ class Encryption implements IEncryptionModule {
 	/** @var Util */
 	private $util;
 
+	/** @var ILogger */
+	private $logger;
+
 	/**
 	 *
 	 * @param \OCA\Encryption\Crypto\Crypt $crypt
 	 * @param KeyManager $keyManager
 	 * @param Util $util
+	 * @param ILogger $logger
 	 */
-	public function __construct(Crypt $crypt, KeyManager $keyManager, Util $util) {
+	public function __construct(Crypt $crypt, KeyManager $keyManager, Util $util, ILogger $logger) {
 		$this->crypt = $crypt;
 		$this->keyManager = $keyManager;
 		$this->util = $util;
+		$this->logger = $logger;
 	}
 
 	/**
@@ -135,6 +142,9 @@ class Encryption implements IEncryptionModule {
 	 * @param string $path to the file
 	 * @return string remained data which should be written to the file in case
 	 *                of a write operation
+	 * @throws PublicKeyMissingException
+	 * @throws \Exception
+	 * @throws \OCA\Encryption\Exceptions\MultiKeyEncryptException
 	 */
 	public function end($path) {
 		$result = '';
@@ -145,7 +155,16 @@ class Encryption implements IEncryptionModule {
 			}
 			$publicKeys = array();
 			foreach ($this->accessList['users'] as $uid) {
-				$publicKeys[$uid] = $this->keyManager->getPublicKey($uid);
+				try {
+					$publicKeys[$uid] = $this->keyManager->getPublicKey($uid);
+				} catch (PublicKeyMissingException $e) {
+					$this->logger->warning('no public key found for user \'' . $uid .
+						'\', user will not be able to read the file', array('app' => 'encryption'));
+					// if the public key of the owner is missing we should fail
+					if ($uid === $this->user) {
+						throw $e;
+					}
+				}
 			}
 
 			$publicKeys = $this->keyManager->addSystemKeys($this->accessList, $publicKeys);
