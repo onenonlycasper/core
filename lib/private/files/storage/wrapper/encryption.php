@@ -23,6 +23,7 @@
 namespace OC\Files\Storage\Wrapper;
 
 use OC\Encryption\Exceptions\ModuleDoesNotExistsException;
+use OC\Encryption\Update;
 use OC\Files\Storage\LocalTempFileTrait;
 use OCP\Files\Mount\IMountPoint;
 
@@ -54,12 +55,16 @@ class Encryption extends Wrapper {
 	/** @var IMountPoint */
 	private $mount;
 
+	/** @var Update */
+	private $update;
+
 	/**
 	 * @param array $parameters
 	 * @param \OC\Encryption\Manager $encryptionManager
 	 * @param \OC\Encryption\Util $util
 	 * @param \OC\Log $logger
 	 * @param \OC\Encryption\File $fileHelper
+	 * @param \OC\Encryption\Update $update
 	 * @param string $uid user who perform the read/write operation (null for public access)
 	 */
 	public function __construct(
@@ -68,6 +73,7 @@ class Encryption extends Wrapper {
 			\OC\Encryption\Util $util = null,
 			\OC\Log $logger = null,
 			\OC\Encryption\File $fileHelper = null,
+			Update $update = null,
 			$uid = null
 		) {
 
@@ -76,6 +82,7 @@ class Encryption extends Wrapper {
 		$this->encryptionManager = $encryptionManager;
 		$this->util = $util;
 		$this->logger = $logger;
+		$this->update = $update;
 		$this->uid = $uid;
 		$this->fileHelper = $fileHelper;
 		$this->unencryptedSize = array();
@@ -185,6 +192,7 @@ class Encryption extends Wrapper {
 		$result = $this->storage->rename($path1, $path2);
 		if ($result) {
 			$target = $this->getFullPath($path2);
+
 			if (isset($this->unencryptedSize[$source])) {
 				$this->unencryptedSize[$target] = $this->unencryptedSize[$source];
 			}
@@ -193,6 +201,9 @@ class Encryption extends Wrapper {
 				$keyStorage = $this->getKeyStorage($encryptionModule->getId());
 				$keyStorage->renameKeys($source, $target);
 			}
+
+			// TODO is the mount point correct?
+			$this->update->update($target, $this->mountPoint);
 		}
 
 		return $result;
@@ -220,6 +231,8 @@ class Encryption extends Wrapper {
 				$keyStorage = $this->getKeyStorage($encryptionModule->getId());
 				$keyStorage->copyKeys($source, $target);
 			}
+
+			$this->update->update($target, $this->mountPoint);
 		}
 
 		return $result;

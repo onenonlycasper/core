@@ -76,22 +76,22 @@ class Update {
 
 	public function postShared($params) {
 		if ($params['itemType'] === 'file' || $params['itemType'] === 'folder') {
-			$this->update($params['fileSource']);
+			$this->updateShare($params['fileSource']);
 		}
 	}
 
 	public function postUnshared($params) {
 		if ($params['itemType'] === 'file' || $params['itemType'] === 'folder') {
-			$this->update($params['fileSource']);
+			$this->updateShare($params['fileSource']);
 		}
 	}
 
 	/**
-	 * update keyfiles and share keys recursively
+	 * update shared/unshared file
 	 *
-	 * @param int $fileSource file source id
+	 * @param $fileSource
 	 */
-	private function update($fileSource) {
+	private function updateShare($fileSource) {
 		$path = \OC\Files\Filesystem::getPath($fileSource);
 		$info = \OC\Files\Filesystem::getFileInfo($path);
 		$owner = \OC\Files\Filesystem::getOwner($path);
@@ -102,18 +102,30 @@ class Update {
 		$mount = $this->mountManager->find($path);
 		$mountPoint = $mount->getMountPoint();
 
+		$this->update($absPath, $mountPoint);
+	}
+
+	/**
+	 * update keyfiles and share keys recursively
+	 *
+	 * @param $path
+	 * @param $mountPoint
+	 * @throws Exceptions\ModuleDoesNotExistsException
+	 */
+	public function update($path, $mountPoint) {
+
 		// if a folder was shared, get a list of all (sub-)folders
-		if ($this->view->is_dir($absPath)) {
-			$allFiles = $this->util->getAllFiles($absPath, $mountPoint);
+		if ($this->view->is_dir($path)) {
+			$allFiles = $this->util->getAllFiles($path, $mountPoint);
 		} else {
-			$allFiles = array($absPath);
+			$allFiles = array($path);
 		}
 
 		$encryptionModule = $this->encryptionManager->getDefaultEncryptionModule();
 
-		foreach ($allFiles as $path) {
-			$usersSharing = $this->file->getAccessList($path);
-			$encryptionModule->update($path, $this->uid, $usersSharing);
+		foreach ($allFiles as $file) {
+			$usersSharing = $this->file->getAccessList($file);
+			$encryptionModule->update($file, $this->uid, $usersSharing);
 		}
 	}
 
