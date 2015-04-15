@@ -316,6 +316,65 @@ class Encryption extends Wrapper {
 	}
 
 	/**
+	 * @param \OCP\Files\Storage $sourceStorage
+	 * @param string $sourceInternalPath
+	 * @param string $targetInternalPath
+	 * @param bool $preserveMtime
+	 * @return bool
+	 */
+	public function moveFromStorage(\OCP\Files\Storage $sourceStorage, $sourceInternalPath, $targetInternalPath, $preserveMtime = false) {
+		$result = $this->copyFromStorage($sourceStorage, $sourceInternalPath, $targetInternalPath, true);
+		if ($result) {
+			if ($sourceStorage->is_dir($sourceInternalPath)) {
+				$result &= $sourceStorage->rmdir($sourceInternalPath);
+			} else {
+				$result &= $sourceStorage->unlink($sourceInternalPath);
+			}
+		}
+		return $result;
+	}
+
+
+	/**
+	 * @param \OCP\Files\Storage $sourceStorage
+	 * @param string $sourceInternalPath
+	 * @param string $targetInternalPath
+	 * @param bool $preserveMtime
+	 * @return bool
+	 */
+	public function copyFromStorage(\OCP\Files\Storage $sourceStorage, $sourceInternalPath, $targetInternalPath, $preserveMtime = false) {
+		if ($sourceStorage->is_dir($sourceInternalPath)) {
+			$dh = $sourceStorage->opendir($sourceInternalPath);
+			$result = $this->mkdir($targetInternalPath);
+			if (is_resource($dh)) {
+				while ($result and ($file = readdir($dh)) !== false) {
+					if (!Filesystem::isIgnoredDir($file)) {
+						$result &= $this->copyFromStorage($sourceStorage, $sourceInternalPath . '/' . $file, $targetInternalPath . '/' . $file);
+					}
+				}
+			}
+		} else {
+			$source = $sourceStorage->fopen($sourceInternalPath, 'r');
+			$target = $this->fopen($targetInternalPath, 'w');
+			list(, $result) = \OC_Helper::streamCopy($source, $target);
+			if ($result and $preserveMtime) {
+				$this->touch($targetInternalPath, $sourceStorage->filemtime($sourceInternalPath));
+			}
+			fclose($source);
+			fclose($target);
+
+			if (!$result) {
+				// delete partially written target file
+				$this->unlink($targetInternalPath);
+				// delete cache entry that was created by fopen
+				$this->getCache()->remove($targetInternalPath);
+			}
+		}
+		return (bool)$result;
+
+	}
+
+	/**
 	 * get the path to a local version of the file.
 	 * The local version of the file can be temporary and doesn't have to be persistent across requests
 	 *
