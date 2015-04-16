@@ -325,7 +325,6 @@ class Storage {
 
 		if ($result !== false) {
 			$storage1->unlink($internalPath1);
-			$storage1->getCache()->remove($internalPath1);
 		}
 
 		return ($result !== false);
