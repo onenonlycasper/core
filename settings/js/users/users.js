@@ -733,30 +733,42 @@ $(document).ready(function () {
 			.focus()
 			.keypress(function (event) {
 				if (event.keyCode === 13) {
-					if ($(this).val().length > 0) {
-						$input.blur();
+					// enter key
+
+					var mailAddress = $input.val();
+
+					if (mailAddress.length > 0) {
+						var $loading = $('<div>')
+							.addClass('loading-small')
+							.css('width', '16px')
+							.css('height', '16px')
+							.css('display', 'inline-block')
+							// edit icon isn't hidden but has opacity 0 -> move the loading indicator
+							.css('margin-left', '-19px');
+						$td.append($loading);
 						$.ajax({
 							type: 'PUT',
 							url: OC.generateUrl('/settings/users/{id}/mailAddress', {id: uid}),
 							data: {
 								mailAddress: $(this).val()
 							}
+						}).success(function () {
+							// set data attriute to new value
+							// will in blur() be used to show the text instead of the input field
+							$tr.data('mailAddress', mailAddress);
+							$input.blur();
 						}).fail(function (result) {
 							OC.Notification.show(result.responseJSON.data.message);
-							// reset the values
-							$tr.data('mailAddress', mailAddress);
-							$tr.children('.mailAddress').children('span').text(mailAddress);
+						}).always(function(){
+							$td.find('.loading-small').remove();
 						});
-					} else {
-						$input.blur();
 					}
 				}
 			})
 			.blur(function () {
-				var mailAddress = $input.val();
-				var $span = $('<span>').text(mailAddress);
-				$tr.data('mailAddress', mailAddress);
+				var $span = $('<span>').text($tr.data('mailAddress'));
 				$input.replaceWith($span);
+				$td.find('img').show();
 			});
 	});
 
