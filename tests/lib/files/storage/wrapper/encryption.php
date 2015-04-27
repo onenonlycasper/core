@@ -59,9 +59,6 @@ class Encryption extends \Test\Files\Storage\Storage {
 		$this->encryptionManager->expects($this->any())
 			->method('getEncryptionModule')
 			->willReturn($mockModule);
-		$this->encryptionManager->expects($this->any())
-			->method('isEnabled')
-			->willReturn(true);
 
 		$config = $this->getMockBuilder('\OCP\IConfig')
 			->disableOriginalConstructor()
@@ -131,16 +128,28 @@ class Encryption extends \Test\Files\Storage\Storage {
 	 *
 	 * @param string $source
 	 * @param string $target
+	 * @param $encryptionEnabled
 	 * @param boolean $renameKeysReturn
 	 * @param boolean $shouldUpdate
 	 */
-	public function testRename($source, $target, $renameKeysReturn, $shouldUpdate) {
-		$this->keyStore
-			->expects($this->once())
-			->method('renameKeys')
-			->willReturn($renameKeysReturn);
+	public function testRename($source,
+							   $target,
+							   $encryptionEnabled,
+							   $renameKeysReturn,
+							   $shouldUpdate) {
+		if ($encryptionEnabled) {
+			$this->keyStore
+				->expects($this->once())
+				->method('renameKeys')
+				->willReturn($renameKeysReturn);
+		} else {
+			$this->keyStore
+				->expects($this->never())->method('renameKeys');
+		}
 		$this->util->expects($this->any())
 			->method('isFile')->willReturn(true);
+		$this->encryptionManager->expects($this->once())
+			->method('isEnabled')->willReturn($encryptionEnabled);
 		if ($shouldUpdate) {
 			$this->update->expects($this->once())
 				->method('update');
@@ -159,16 +168,28 @@ class Encryption extends \Test\Files\Storage\Storage {
 	 *
 	 * @param string $source
 	 * @param string $target
+	 * @param $encryptionEnabled
 	 * @param boolean $copyKeysReturn
 	 * @param boolean $shouldUpdate
 	 */
-	public function testCopyTesting($source, $target, $copyKeysReturn, $shouldUpdate) {
-		$this->keyStore
-			->expects($this->once())
-			->method('copyKeys')
-			->willReturn($copyKeysReturn);
+	public function testCopy($source,
+							 $target,
+							 $encryptionEnabled,
+							 $copyKeysReturn,
+							 $shouldUpdate) {
+		if ($encryptionEnabled) {
+			$this->keyStore
+				->expects($this->once())
+				->method('copyKeys')
+				->willReturn($copyKeysReturn);
+		} else {
+			$this->keyStore
+				->expects($this->never())->method('copyKeys');
+		}
 		$this->util->expects($this->any())
 			->method('isFile')->willReturn(true);
+		$this->encryptionManager->expects($this->once())
+			->method('isEnabled')->willReturn($encryptionEnabled);
 		if ($shouldUpdate) {
 			$this->update->expects($this->once())
 				->method('update');
@@ -183,23 +204,17 @@ class Encryption extends \Test\Files\Storage\Storage {
 	}
 
 	/**
-	 * @dataProvider copyAndMoveProvider
-	 */
-	public function testCopy($source, $target) {
-		$this->assertTrue(true, 'Replaced by testCopyTesting()');
-	}
-
-	/**
 	 * data provider for testCopyTesting() and dataTestCopyAndRename()
 	 *
 	 * @return array
 	 */
 	public function dataTestCopyAndRename() {
 		return array(
-			array('source', 'target', false, false),
-			array('source', 'target', true, false),
-			array('source', '/subFolder/target', false, false),
-			array('source', '/subFolder/target', true, true),
+			array('source', 'target', true, false, false),
+			array('source', 'target', true, true, false),
+			array('source', '/subFolder/target', true, false, false),
+			array('source', '/subFolder/target', true, true, true),
+			array('source', '/subFolder/target', false, true, false),
 		);
 	}
 
